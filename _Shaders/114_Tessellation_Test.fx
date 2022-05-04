@@ -13,36 +13,26 @@ float4 PS(MeshOutput input) : SV_Target
 
 }
 
-struct VertexTS
+struct TSVertex
 {
 	float3 position : CONTROL_POINT_POSITION;
-	float2 Scale : Scale;
-	uint MapIndex : MapIndex;
+	float4 color : COLOR;
 };
 
 struct TSVertexOutput
 {
 	float3 position : WORLD_SPACE_CONTROL_POINT_POSITION;
-	float2 Scale : Scale;
-	uint MapIndex : MapIndex;
+	float3 color : COLOR;
+
 };
 
-TSVertexOutput VS_TS_Out(VertexTS input)
+TSVertexOutput VS_TS_Out(TSVertex input)
 {
 	TSVertexOutput output;
 	output.position = WorldPosition(float4(input.position, 1.0f)).xyz;
-	output.Scale = input.Scale;
-	output.MapIndex = input.MapIndex;
+	output.color = input.color.rgb;
 	return output;
 }
-
-
-// Output control point
-struct BEZIER_CONTROL_POINT
-{
-	float3 vPosition : BEZIERPOS;
-};
-
 
 
 struct OutputConstantHS
@@ -54,16 +44,18 @@ struct OutputConstantHS
 struct OutputHS
 {
 	float3 position : CONTROL_POINT_POSITION;
-	uint MapIndex : MapIndex;
+	float3 color : COLOR;
 };
 
 
-void MainConstantHS(InputPatch<TSVertexOutput, 3> InPatches,
+OutputConstantHS MainConstantHS(InputPatch<TSVertexOutput, 3> InPatches,
 				 uint uPatchID : SV_PrimitiveID)
 {
 	OutputConstantHS output;
 	output.edges[0] = output.edges[1] = output.edges[2] = TessellationFactor;
 	output.inside = TessellationFactor;
+	
+	return output;
 
 }
 
@@ -79,7 +71,7 @@ OutputHS MainHS(InputPatch<TSVertexOutput, 3> InPatches,
 {
 	OutputHS output;
 	output.position = InPatches[uControlPointID].position;
-	output.MapIndex = InPatches[uControlPointID].MapIndex;
+	output.color = InPatches[uControlPointID].color;
 	
 	
 	return output;
@@ -150,6 +142,14 @@ OutputDS MainDS(OutputConstantHS input, //OutputDS
 
 	output.position = mul(float4(output.wPos, 1.0f),TessellationVP);
 	
+	float3 finalVertexColour = float3(0.0f, 0.0f, 0.0f);
+    
+	finalVertexColour += (Patches[0].color * uvw.x);
+	finalVertexColour += (Patches[1].color * uvw.y);
+	finalVertexColour += (Patches[2].color * uvw.z);
+	
+	output.colour = finalVertexColour;
+	
 	return output;
 
 }
@@ -172,7 +172,8 @@ float4 MainSolidPS(OutputDS In) : SV_TARGET
 
 technique11 T0
 {
-	P_VP(P0, VS_Mesh, PS)
+	//P_VP(P0, VS_Mesh, PS)
+	P_RS_VP(P0, FillMode_WireFrame, VS_Mesh, PS)
 	P_VP(P1, VS_Model, PS)
 	P_VP(P2, VS_Animation, PS)
 
